@@ -1,0 +1,10 @@
+out/
+*.class
+*.jar
+.env
+.env.*
+!.env.example
+db.properties
+db.properties.*
+!db.properties.example
+*.log
