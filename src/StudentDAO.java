@@ -109,7 +109,7 @@ public class StudentDAO {
             return false;
         }
 
-        String sql = "INSERT INTO students (roll_no, name, department, current_semester) VALUES (?, ?, ?, ?)";
+        String sql = "INSERT INTO students (roll_no, student_name, department, current_semester) VALUES (?, ?, ?, ?)";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -153,7 +153,7 @@ public class StudentDAO {
      */
     public List<Student> getAllStudents() {
         List<Student> list = new ArrayList<>();
-        String sql = "SELECT roll_no, name, department, current_semester FROM students ORDER BY department, roll_no";
+        String sql = "SELECT roll_no, student_name, department, current_semester FROM students ORDER BY department, roll_no";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql);
@@ -162,7 +162,7 @@ public class StudentDAO {
             while (rs.next()) {
                 list.add(new Student(
                         rs.getString("roll_no"),
-                        rs.getString("name"),
+                        rs.getString("student_name"),
                         rs.getString("department"),
                         rs.getInt("current_semester")
                 ));
@@ -179,7 +179,7 @@ public class StudentDAO {
     public Student getStudentByRollNo(String rollNo) {
         if (rollNo == null || rollNo.trim().isEmpty()) return null;
 
-        String sql = "SELECT roll_no, name, department, current_semester FROM students WHERE roll_no = ?";
+        String sql = "SELECT roll_no, student_name, department, current_semester FROM students WHERE roll_no = ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
@@ -188,7 +188,7 @@ public class StudentDAO {
                 if (rs.next()) {
                     return new Student(
                             rs.getString("roll_no"),
-                            rs.getString("name"),
+                            rs.getString("student_name"),
                             rs.getString("department"),
                             rs.getInt("current_semester")
                     );

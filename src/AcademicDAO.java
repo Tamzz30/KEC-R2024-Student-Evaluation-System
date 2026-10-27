@@ -140,12 +140,12 @@ public class AcademicDAO {
             return false;
         }
 
-        String sql = "INSERT INTO enrollments (student_roll_no, course_code, semester, " +
-                     "classes_held, classes_attended, medical_condonation) " +
+        String sql = "INSERT INTO enrollments (roll_no, course_code, semester, " +
+                     "classes_held, classes_attended, medical_condonation_approved) " +
                      "VALUES (?, ?, ?, ?, ?, ?) " +
                      "ON DUPLICATE KEY UPDATE classes_held = VALUES(classes_held), " +
                      "classes_attended = VALUES(classes_attended), " +
-                     "medical_condonation = VALUES(medical_condonation)";
+                     "medical_condonation_approved = VALUES(medical_condonation_approved)";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -174,8 +174,8 @@ public class AcademicDAO {
             return false;
         }
 
-        String sql = "UPDATE enrollments SET classes_held = ?, classes_attended = ?, medical_condonation = ? " +
-                     "WHERE student_roll_no = ? AND course_code = ? AND semester = ?";
+        String sql = "UPDATE enrollments SET classes_held = ?, classes_attended = ?, medical_condonation_approved = ? " +
+                     "WHERE roll_no = ? AND course_code = ? AND semester = ?";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -199,7 +199,7 @@ public class AcademicDAO {
      * Resolves an enrollment ID for a student, course, and semester.
      */
     public Integer getEnrollmentId(String rollNo, String courseCode, int semester) {
-        String sql = "SELECT enrollment_id FROM enrollments WHERE student_roll_no = ? AND course_code = ? AND semester = ?";
+        String sql = "SELECT enrollment_id FROM enrollments WHERE roll_no = ? AND course_code = ? AND semester = ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
@@ -226,12 +226,12 @@ public class AcademicDAO {
      * Helper to ensure an assessment_marks row exists for an enrollment.
      */
     private void ensureAssessmentRecordExists(Connection conn, int enrollmentId) throws SQLException {
-        String checkSql = "SELECT 1 FROM assessment_marks WHERE enrollment_id = ?";
+        String checkSql = "SELECT 1 FROM assessment_marks m JOIN enrollments e ON m.roll_no = e.roll_no AND m.course_code = e.course_code WHERE e.enrollment_id = ?";
         try (PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
             checkStmt.setInt(1, enrollmentId);
             try (ResultSet rs = checkStmt.executeQuery()) {
                 if (!rs.next()) {
-                    String insertSql = "INSERT INTO assessment_marks (enrollment_id) VALUES (?)";
+                    String insertSql = "INSERT INTO assessment_marks (roll_no, course_code) SELECT roll_no, course_code FROM enrollments WHERE enrollment_id = ?";
                     try (PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
                         insertStmt.setInt(1, enrollmentId);
                         insertStmt.executeUpdate();
@@ -252,7 +252,7 @@ public class AcademicDAO {
 
         try (Connection conn = DBConnection.getConnection()) {
             ensureAssessmentRecordExists(conn, enrollmentId);
-            String sql = "UPDATE assessment_marks SET cia1 = ? WHERE enrollment_id = ?";
+            String sql = "UPDATE assessment_marks m JOIN enrollments e ON m.roll_no = e.roll_no AND m.course_code = e.course_code SET m.cia1 = ? WHERE e.enrollment_id = ?";
             try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
                 pstmt.setDouble(1, marks);
                 pstmt.setInt(2, enrollmentId);
@@ -275,7 +275,7 @@ public class AcademicDAO {
 
         try (Connection conn = DBConnection.getConnection()) {
             ensureAssessmentRecordExists(conn, enrollmentId);
-            String sql = "UPDATE assessment_marks SET cia2 = ? WHERE enrollment_id = ?";
+            String sql = "UPDATE assessment_marks m JOIN enrollments e ON m.roll_no = e.roll_no AND m.course_code = e.course_code SET m.cia2 = ? WHERE e.enrollment_id = ?";
             try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
                 pstmt.setDouble(1, marks);
                 pstmt.setInt(2, enrollmentId);
@@ -298,7 +298,7 @@ public class AcademicDAO {
 
         try (Connection conn = DBConnection.getConnection()) {
             ensureAssessmentRecordExists(conn, enrollmentId);
-            String sql = "UPDATE assessment_marks SET assignment_quiz_lab = ? WHERE enrollment_id = ?";
+            String sql = "UPDATE assessment_marks m JOIN enrollments e ON m.roll_no = e.roll_no AND m.course_code = e.course_code SET m.coursework = ? WHERE e.enrollment_id = ?";
             try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
                 pstmt.setDouble(1, marks);
                 pstmt.setInt(2, enrollmentId);
@@ -325,7 +325,7 @@ public class AcademicDAO {
 
         try (Connection conn = DBConnection.getConnection()) {
             ensureAssessmentRecordExists(conn, enrollmentId);
-            String sql = "UPDATE assessment_marks SET ese = ?, is_absent_ese = ? WHERE enrollment_id = ?";
+            String sql = "UPDATE assessment_marks m JOIN enrollments e ON m.roll_no = e.roll_no AND m.course_code = e.course_code SET m.ese_marks = ?, m.ese_absent = ? WHERE e.enrollment_id = ?";
             try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
                 if (isAbsent) {
                     pstmt.setNull(1, Types.DECIMAL);
@@ -534,7 +534,7 @@ public class AcademicDAO {
     public SemesterMarkSheet generateSemesterMarkSheet(String rollNo, int semester) {
         if (rollNo == null) return null;
 
-        String studentSql = "SELECT roll_no, name, department FROM students WHERE roll_no = ?";
+        String studentSql = "SELECT roll_no, student_name, department FROM students WHERE roll_no = ?";
         SemesterMarkSheet sheet = new SemesterMarkSheet();
         sheet.rollNo = rollNo.trim().toUpperCase();
         sheet.semester = semester;
@@ -545,7 +545,7 @@ public class AcademicDAO {
             studentStmt.setString(1, sheet.rollNo);
             try (ResultSet rs = studentStmt.executeQuery()) {
                 if (rs.next()) {
-                    sheet.studentName = rs.getString("name");
+                    sheet.studentName = rs.getString("student_name");
                     sheet.department = rs.getString("department");
                 } else {
                     return null; // Student not found
@@ -554,12 +554,12 @@ public class AcademicDAO {
 
             String evalSql =
                 "SELECT e.enrollment_id, e.course_code, c.title, c.credits, c.course_type, " +
-                "       e.classes_held, e.classes_attended, e.medical_condonation, " +
-                "       m.cia1, m.cia2, m.assignment_quiz_lab, m.ese, m.is_absent_ese " +
+                "       e.classes_held, e.classes_attended, e.medical_condonation_approved, " +
+                "       m.cia1, m.cia2, m.coursework, m.ese_marks, m.ese_absent " +
                 "FROM enrollments e " +
                 "JOIN courses c ON e.course_code = c.course_code " +
-                "LEFT JOIN assessment_marks m ON e.enrollment_id = m.enrollment_id " +
-                "WHERE e.student_roll_no = ? AND e.semester = ? " +
+                "LEFT JOIN assessment_marks m ON e.roll_no = m.roll_no AND e.course_code = m.course_code " +
+                "WHERE e.roll_no = ? AND e.semester = ? " +
                 "ORDER BY e.course_code";
 
             try (PreparedStatement evalStmt = conn.prepareStatement(evalSql)) {
@@ -579,13 +579,13 @@ public class AcademicDAO {
                         int creds = rs.getInt("credits");
                         int held = rs.getInt("classes_held");
                         int attended = rs.getInt("classes_attended");
-                        boolean condonation = rs.getBoolean("medical_condonation");
+                        boolean condonation = rs.getBoolean("medical_condonation_approved");
 
                         Double cia1 = getNullableDouble(rs, "cia1");
                         Double cia2 = getNullableDouble(rs, "cia2");
-                        Double assgn = getNullableDouble(rs, "assignment_quiz_lab");
-                        Double ese = getNullableDouble(rs, "ese");
-                        boolean isAbsent = rs.getBoolean("is_absent_ese");
+                        Double assgn = getNullableDouble(rs, "coursework");
+                        Double ese = getNullableDouble(rs, "ese_marks");
+                        boolean isAbsent = rs.getBoolean("ese_absent");
 
                         CourseEvaluationResult eval = evaluateCourse(
                                 code, title, type, creds, held, attended, condonation,
@@ -643,10 +643,10 @@ public class AcademicDAO {
         List<AttendanceDefaulterItem> list = new ArrayList<>();
 
         String sql =
-            "SELECT s.roll_no, s.name, s.department, e.semester, " +
-            "       e.course_code, c.title, e.classes_held, e.classes_attended, e.medical_condonation " +
+            "SELECT s.roll_no, s.student_name, s.department, e.semester, " +
+            "       e.course_code, c.title, e.classes_held, e.classes_attended, e.medical_condonation_approved " +
             "FROM enrollments e " +
-            "JOIN students s ON e.student_roll_no = s.roll_no " +
+            "JOIN students s ON e.roll_no = s.roll_no " +
             "JOIN courses c ON e.course_code = c.course_code " +
             "WHERE e.classes_held > 0 " +
             "ORDER BY s.department, s.roll_no, e.course_code";
@@ -658,7 +658,7 @@ public class AcademicDAO {
             while (rs.next()) {
                 int held = rs.getInt("classes_held");
                 int attended = rs.getInt("classes_attended");
-                boolean condonation = rs.getBoolean("medical_condonation");
+                boolean condonation = rs.getBoolean("medical_condonation_approved");
                 double pct = ((double) attended / held) * 100.0;
 
                 boolean isDefaulter = false;
@@ -675,7 +675,7 @@ public class AcademicDAO {
                 if (isDefaulter) {
                     AttendanceDefaulterItem item = new AttendanceDefaulterItem();
                     item.rollNo = rs.getString("roll_no");
-                    item.studentName = rs.getString("name");
+                    item.studentName = rs.getString("student_name");
                     item.department = rs.getString("department");
                     item.semester = rs.getInt("semester");
                     item.courseCode = rs.getString("course_code");

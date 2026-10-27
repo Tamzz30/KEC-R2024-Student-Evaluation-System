@@ -1,3 +1,4 @@
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -6,11 +7,11 @@ public final class DBConnection {
 
     private static final String URL = System.getenv().getOrDefault(
         "KEC_EVAL_DB_URL",
-        "jdbc:mysql://localhost:3306/kec_eval_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&createDatabaseIfNotExist=true"
+        "jdbc:mysql://localhost:3306/kec_academic?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kolkata"
     );
 
     private static final String USER =
-        System.getenv().getOrDefault("KEC_DB_USER", "root");
+        System.getenv().getOrDefault("KEC_DB_USER", "kec_app");
 
     private static final String PASSWORD =
         System.getenv().getOrDefault("KEC_DB_PASSWORD", "");
@@ -34,3 +35,5 @@ public final class DBConnection {
         return URL;
     }
 }
+
+
